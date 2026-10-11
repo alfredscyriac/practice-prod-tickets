@@ -1,0 +1,9 @@
+[project]
+name = "nyc-health-network"
+version = "0.4.2"
+description = "Appointment, admission and billing backend for the NYC hospital network"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

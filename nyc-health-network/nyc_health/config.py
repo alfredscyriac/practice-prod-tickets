@@ -1,0 +1,25 @@
+"""Static configuration. Money is always expressed in integer cents."""
+
+APPOINTMENT_SLOT_MINUTES = 30
+MAX_APPOINTMENT_MINUTES = 120
+BUSINESS_OPEN_HOUR = 8
+BUSINESS_CLOSE_HOUR = 18
+MAX_DAILY_APPOINTMENTS_PER_DOCTOR = 12
+MIN_BOOKING_LEAD_MINUTES = 60
+MAX_SHIFT_HOURS = 12
+
+NO_SHOW_FEE_CENTS = 5_000
+
+PROCEDURE_PRICES_CENTS = {
+    "CONSULT": 25_000,
+    "FOLLOWUP": 15_000,
+    "XRAY": 18_000,
+    "BLOODWORK": 9_500,
+    "MRI": 120_000,
+    "ER_VISIT": 150_000,
+}
+
+# NYC area codes accepted for patient phone numbers.
+NYC_AREA_CODES = {"212", "332", "347", "646", "718", "917", "929", "934"}
+
+DEFAULT_COVERAGE_PCT = 80
