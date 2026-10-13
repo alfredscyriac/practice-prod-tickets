@@ -1,15 +1,18 @@
 from typing import List, Optional
 
 from nyc_health.models.patient import Borough, Patient
-from nyc_health.repositories.base import InMemoryRepository
+from nyc_health.repositories.base import MongoRepository
 
 
-class PatientRepository(InMemoryRepository[Patient]):
+class PatientRepository(MongoRepository[Patient]):
     entity_name = "patient"
     id_prefix = "PAT"
+    collection_name = "patients"
+    model = Patient
+    indexes = [("phone",)]
 
     def find_by_phone(self, phone: str) -> Optional[Patient]:
-        matches = self.find(lambda p: p.phone == phone)
+        matches = self.find_where({"phone": phone}, limit=1)
         return matches[0] if matches else None
 
     def search_by_last_name(self, fragment: str) -> List[Patient]:
@@ -20,4 +23,4 @@ class PatientRepository(InMemoryRepository[Patient]):
         )
 
     def in_borough(self, borough: Borough) -> List[Patient]:
-        return self.find(lambda p: p.borough is borough)
+        return self.find_where({"borough": borough.value})

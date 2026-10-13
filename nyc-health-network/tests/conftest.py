@@ -66,4 +66,4 @@ def insured_patient(container, patient):
         patient.id, "EmblemHealth Gold", "EMB-1029384", date(2026, 12, 31),
         copay_cents=3_000, deductible_cents=150_000, coverage_pct=80,
     )
-    return patient
+    return container.patients.get(patient.id)  # reload: repositories return copies

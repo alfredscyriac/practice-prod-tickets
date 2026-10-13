@@ -159,3 +159,10 @@ class TestAvailability:
         late = container.scheduling.book(patient.id, doctor.id, at(15))
         early = container.scheduling.book(other_patient.id, doctor.id, at(9))
         assert [a.id for a in container.scheduling.agenda_for_doctor(doctor.id, BOOKING_DAY)] == [early.id, late.id]
+
+
+def test_complete_persists_notes(container, doctor, patient):
+    appointment = container.scheduling.book(patient.id, doctor.id, at(10))
+    container.scheduling.check_in(appointment.id)
+    container.scheduling.complete(appointment.id, notes="stable, follow up in 6 weeks")
+    assert container.appointments_repo.get(appointment.id).notes == "stable, follow up in 6 weeks"

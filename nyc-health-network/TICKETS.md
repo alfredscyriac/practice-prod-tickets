@@ -4,6 +4,14 @@ You have been assigned the tickets below. **Complete ONE** of them (your choice)
 you would on the job: understand the problem, find the relevant code, make the change, and add or
 update tests. The full existing test suite must still pass (`pytest`).
 
+Ground rules
+- There is **no failing test** waiting for you. For bugs, reproduce the problem yourself and write
+  the regression test from scratch before (or while) you fix it.
+- Production runs against MongoDB and Redis on several app servers; in this repo those are the
+  in-process stand-ins in `nyc_health/db/`. Write the solution as you would for the real thing.
+- Some tickets are small fixes, others need a bit of design thinking. Read the whole ticket,
+  including the "Operational context" notes.
+
 ---
 
 ## HN-412 — Doctors are being double-booked
@@ -28,7 +36,7 @@ short overnight coverage shift "inside" a longer shift she already had.
 **Acceptance criteria**
 - The reproduction above is rejected with a scheduling conflict error.
 - Existing valid bookings (back-to-back, different doctors, cancelled slots reused) still work.
-- Regression tests cover the failing scenario for appointments and for shifts.
+- Regression tests (that you write) cover the failing scenario for appointments and for shifts.
 
 ---
 
@@ -81,9 +89,18 @@ on a given day and be offered cancelled slots automatically.
 - A patient who is promoted is removed from the waitlist.
 - Cancellation must still succeed even if nobody can be promoted.
 
+**Operational context**
+- During flu season the Bellevue cardiology waitlist can hold tens of thousands of entries across
+  all doctors and dates, and a clinic closing early can cancel dozens of appointments within seconds.
+  Handling one cancellation must only look at the waitlist entries for that doctor and date.
+- Cancellation events are delivered **at least once**: the same cancellation can be processed twice,
+  and it can be processed by two app servers at the same moment. It must never promote two patients
+  into one slot or send the same patient two "you're booked" messages.
+
 **Acceptance criteria**
 - Waitlist behavior is covered by tests (join, leave, duplicate join, promotion order, skip rules,
-  nobody eligible).
+  nobody eligible, duplicate/redelivered cancellation).
+- Handling a cancellation does not scan the whole waitlist.
 - Existing cancellation and notification behavior is unchanged for doctors without a waitlist.
 
 ---
@@ -109,7 +126,16 @@ Isolation after a positive test) and need an audit trail of every move.
 - A `patient.transferred` event is published after a successful transfer.
 - Transfers of discharged admissions are not allowed.
 
+**Operational context**
+- Several supervisors, on different app servers, work the same wards at once. When the ICU has a
+  single free bed and two supervisors submit transfers for two different patients at the same moment,
+  exactly one must get the bed; the other must fail cleanly and stay where they are. A bed must never
+  end up assigned to two admissions.
+- Every nurse station polls the ward occupancy view every few seconds, so it has to stay cheap -
+  but it must never show numbers that are out of date after a transfer.
+
 **Acceptance criteria**
-- New behavior is covered by tests, including failure paths that must leave occupancy untouched.
+- New behavior is covered by tests, including failure paths that must leave occupancy untouched and
+  the "last free bed" race.
 - Occupancy reports remain correct after transfers.
 - Existing admit/discharge behavior is unchanged.

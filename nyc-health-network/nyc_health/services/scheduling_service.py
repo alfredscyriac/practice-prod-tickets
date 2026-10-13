@@ -100,8 +100,10 @@ class SchedulingService:
         return self._transition(appointment_id, AppointmentStatus.CHECKED_IN)
 
     def complete(self, appointment_id: str, notes: str = "") -> Appointment:
-        appointment = self._transition(appointment_id, AppointmentStatus.COMPLETED)
+        appointment = self._appointments.get(appointment_id)
+        appointment.transition_to(AppointmentStatus.COMPLETED, self._clock.now())
         appointment.notes = notes
+        self._appointments.update(appointment)
         self._events.publish("appointment.completed", self._event_payload(appointment))
         return appointment
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import List
 
 from nyc_health.exceptions import ValidationError
 
@@ -40,7 +41,7 @@ class Appointment:
     created_at: datetime
     status: AppointmentStatus = AppointmentStatus.SCHEDULED
     notes: str = ""
-    history: list = field(default_factory=list)
+    history: List[dict] = field(default_factory=list)  # [{'from': status, 'to': status, 'at': datetime}]
 
     @property
     def end(self) -> datetime:
@@ -58,5 +59,5 @@ class Appointment:
             raise ValidationError(
                 f"cannot move appointment {self.id} from {self.status.value} to {new_status.value}"
             )
-        self.history.append((self.status, new_status, at))
+        self.history.append({"from": self.status.value, "to": new_status.value, "at": at})
         self.status = new_status

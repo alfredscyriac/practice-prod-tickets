@@ -2,12 +2,14 @@ from datetime import datetime
 from typing import List
 
 from nyc_health.models.staff import Role, Shift, Specialty, Staff
-from nyc_health.repositories.base import InMemoryRepository
+from nyc_health.repositories.base import MongoRepository
 
 
-class StaffRepository(InMemoryRepository[Staff]):
+class StaffRepository(MongoRepository[Staff]):
     entity_name = "staff member"
     id_prefix = "STF"
+    collection_name = "staff"
+    model = Staff
 
     def by_role(self, role: Role) -> List[Staff]:
         return self.find(lambda s: s.role is role)
@@ -20,12 +22,15 @@ class StaffRepository(InMemoryRepository[Staff]):
         )
 
 
-class ShiftRepository(InMemoryRepository[Shift]):
+class ShiftRepository(MongoRepository[Shift]):
     entity_name = "shift"
     id_prefix = "SHF"
+    collection_name = "shifts"
+    model = Shift
+    indexes = [("staff_id",)]
 
     def for_staff(self, staff_id: str) -> List[Shift]:
-        return sorted(self.find(lambda s: s.staff_id == staff_id), key=lambda s: s.start)
+        return self.find_where({"staff_id": staff_id}, sort=[("start", 1)])
 
     def on_day(self, day) -> List[Shift]:
         return self.find(lambda s: s.start.date() == day)

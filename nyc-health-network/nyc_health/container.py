@@ -4,6 +4,7 @@ from typing import Optional
 
 from nyc_health.core.clock import Clock
 from nyc_health.core.event_bus import EventBus
+from nyc_health.db import FakeMongoDatabase, FakeRedis
 from nyc_health.repositories.appointment_repo import AppointmentRepository
 from nyc_health.repositories.bed_repo import AdmissionRepository, BedRepository
 from nyc_health.repositories.billing_repo import InvoiceRepository
@@ -26,6 +27,8 @@ from nyc_health.utils.ids import IdGenerator
 class Container:
     clock: Clock
     events: EventBus
+    db: FakeMongoDatabase
+    cache: FakeRedis
     patients_repo: PatientRepository
     staff_repo: StaffRepository
     shifts_repo: ShiftRepository
@@ -45,32 +48,38 @@ class Container:
     reporting: ReportingService
 
 
-def build_container(clock: Optional[Clock] = None) -> Container:
+def build_container(
+    clock: Optional[Clock] = None,
+    db: Optional[FakeMongoDatabase] = None,
+    cache: Optional[FakeRedis] = None,
+) -> Container:
     clock = clock or Clock()
+    db = db or FakeMongoDatabase()
+    cache = cache or FakeRedis(clock)
     ids = IdGenerator()
     events = EventBus()
 
-    patients_repo = PatientRepository(ids)
-    staff_repo = StaffRepository(ids)
-    shifts_repo = ShiftRepository(ids)
-    appointments_repo = AppointmentRepository(ids)
-    beds_repo = BedRepository(ids)
-    admissions_repo = AdmissionRepository(ids)
-    invoices_repo = InvoiceRepository(ids)
-    policies_repo = PolicyRepository(ids)
-    notifications_repo = NotificationRepository(ids)
+    patients_repo = PatientRepository(db, ids)
+    staff_repo = StaffRepository(db, ids)
+    shifts_repo = ShiftRepository(db, ids)
+    appointments_repo = AppointmentRepository(db, ids)
+    beds_repo = BedRepository(db, ids)
+    admissions_repo = AdmissionRepository(db, ids)
+    invoices_repo = InvoiceRepository(db, ids)
+    policies_repo = PolicyRepository(db, ids)
+    notifications_repo = NotificationRepository(db, ids)
 
-    patients = PatientService(patients_repo, policies_repo, clock)
+    patients = PatientService(patients_repo, policies_repo, cache, clock)
     shifts = ShiftService(shifts_repo, staff_repo)
     scheduling = SchedulingService(appointments_repo, patients_repo, staff_repo, shifts, events, clock)
     notifications = NotificationService(notifications_repo, patients_repo, events, clock)
     insurance = InsuranceService(policies_repo)
     billing = BillingService(invoices_repo, appointments_repo, patients_repo, insurance, clock)
-    beds = BedService(beds_repo, admissions_repo, patients_repo, events, clock)
+    beds = BedService(beds_repo, admissions_repo, patients_repo, cache, events, clock)
     reporting = ReportingService(appointments_repo, invoices_repo, beds)
 
     return Container(
-        clock=clock, events=events, patients_repo=patients_repo, staff_repo=staff_repo,
+        clock=clock, events=events, db=db, cache=cache, patients_repo=patients_repo, staff_repo=staff_repo,
         shifts_repo=shifts_repo, appointments_repo=appointments_repo, beds_repo=beds_repo,
         admissions_repo=admissions_repo, invoices_repo=invoices_repo, policies_repo=policies_repo,
         notifications_repo=notifications_repo, patients=patients, shifts=shifts,

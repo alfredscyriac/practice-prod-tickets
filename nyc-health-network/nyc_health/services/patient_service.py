@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from nyc_health import config
 from nyc_health.core.clock import Clock
+from nyc_health.db import FakeRedis, codec
 from nyc_health.exceptions import ValidationError
 from nyc_health.models.insurance import InsurancePolicy
 from nyc_health.models.notification import NotificationChannel
@@ -13,9 +14,12 @@ from nyc_health.utils import validators
 
 
 class PatientService:
-    def __init__(self, patients: PatientRepository, policies: PolicyRepository, clock: Clock) -> None:
+    def __init__(
+        self, patients: PatientRepository, policies: PolicyRepository, cache: FakeRedis, clock: Clock
+    ) -> None:
         self._patients = patients
         self._policies = policies
+        self._cache = cache
         self._clock = clock
 
     def register(
@@ -41,8 +45,18 @@ class PatientService:
         )
         return self._patients.add(patient)
 
+    @staticmethod
+    def _cache_key(patient_id: str) -> str:
+        return f"patient:{patient_id}"
+
     def get(self, patient_id: str) -> Patient:
-        return self._patients.get(patient_id)
+        """Cache-aside read: Redis first, then Mongo (and populate the cache)."""
+        cached = self._cache.get(self._cache_key(patient_id))
+        if cached is not None:
+            return codec.loads(Patient, cached)
+        patient = self._patients.get(patient_id)
+        self._cache.setex(self._cache_key(patient_id), config.PATIENT_CACHE_TTL_SECONDS, codec.dumps(patient))
+        return patient
 
     def update_contact(
         self,
@@ -60,11 +74,13 @@ class PatientService:
             if preferred_channel is NotificationChannel.EMAIL and not patient.email:
                 raise ValidationError("cannot prefer email without an email address on file")
             patient.preferred_channel = preferred_channel
+        self._cache.delete(self._cache_key(patient_id))
         return self._patients.update(patient)
 
     def flag_infectious(self, patient_id: str, infectious: bool) -> Patient:
         patient = self._patients.get(patient_id)
         patient.is_infectious = infectious
+        self._cache.delete(self._cache_key(patient_id))
         return self._patients.update(patient)
 
     def attach_insurance(
@@ -95,6 +111,7 @@ class PatientService:
         self._policies.add(policy)
         patient.insurance_policy_id = policy.id
         self._patients.update(patient)
+        self._cache.delete(self._cache_key(patient_id))
         return policy
 
     def search(self, last_name_fragment: str) -> List[Patient]:
